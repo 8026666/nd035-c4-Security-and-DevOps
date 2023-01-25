@@ -2,9 +2,12 @@ package com.example.demo.controllers;
 
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,9 +27,11 @@ public class UserController {
 	
 	@Autowired
 	private UserRepository userRepository;
-	
 	@Autowired
 	private CartRepository cartRepository;
+	public static final Logger log = LoggerFactory.getLogger(UserController.class);
+	@Autowired
+	private BCryptPasswordEncoder bCryptPasswordEncoder;
 
 	@GetMapping("/id/{id}")
 	public ResponseEntity<User> findById(@PathVariable Long id) {
@@ -41,12 +46,23 @@ public class UserController {
 	
 	@PostMapping("/create")
 	public ResponseEntity<User> createUser(@RequestBody CreateUserRequest createUserRequest) {
+		if(!createUserRequest.getPassword().equals(createUserRequest.getConfirmPassword())
+				|| createUserRequest.getPassword().length() < 8) {
+			log.error("Password does not meet the safety requirement.");
+			return ResponseEntity.badRequest().build();
+		}
 		User user = new User();
-		user.setUsername(createUserRequest.getUsername());
-		Cart cart = new Cart();
-		cartRepository.save(cart);
-		user.setCart(cart);
-		userRepository.save(user);
+		try {
+			user.setUsername(createUserRequest.getUsername());
+			user.setPassword(bCryptPasswordEncoder.encode(createUserRequest.getPassword()));
+			Cart cart = new Cart();
+			cartRepository.save(cart);
+			user.setCart(cart);
+			userRepository.save(user);
+		} catch (Exception e) {
+			log.error("Create new user Error: " + e.getMessage());
+		}
+		log.info("New user " + user.getUsername() + " created successfully.");
 		return ResponseEntity.ok(user);
 	}
 	
